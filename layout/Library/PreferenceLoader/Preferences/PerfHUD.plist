@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>entry</key>
+	<dict>
+		<key>cell</key>
+		<string>PSLinkCell</string>
+		<key>icon</key>
+		<string>PerfHUD.png</string>
+		<key>label</key>
+		<string>PerfHUD</string>
+	</dict>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>HUD Settings</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>key</key>
+			<string>enabled</string>
+			<key>label</key>
+			<string>Enabled</string>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSLinkListCell</string>
+			<key>default</key>
+			<integer>0</integer>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>detail</key>
+			<string>PSListItemsController</string>
+			<key>key</key>
+			<string>position</string>
+			<key>label</key>
+			<string>Initial Corner</string>
+			<key>validTitles</key>
+			<array>
+				<string>Top-Right</string>
+				<string>Bottom-Right</string>
+				<string>Bottom-Left</string>
+				<string>Top-Left</string>
+			</array>
+			<key>validValues</key>
+			<array>
+				<integer>0</integer>
+				<integer>1</integer>
+				<integer>2</integer>
+				<integer>3</integer>
+			</array>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>key</key>
+			<string>wireframe</string>
+			<key>label</key>
+			<string>Wireframe (No Background)</string>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Interactive Controls</string>
+			<key>footerText</key>
+			<string>Tap directly on the HUD panel anytime to jump it to the next corner clockwise, unblocking the interface beneath.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>CLI Telemetry Streaming</string>
+			<key>footerText</key>
+			<string>Read real-time metrics remotely over SSH without GUI overhead:
+• Single shot: perfhud-cli
+• Continuous stream: perfhud-cli -f
+Data is written atomically to RAM (/tmp/perfhud.stat) with zero NAND flash wear.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>RAM Breakdown Legend</string>
+			<key>footerText</key>
+			<string>The multi-color horizontal bar and metrics show exact RAM pages:
+• W (Wired, Red): Fixed kernel memory, Mach ports, XNU buffers.
+• A (Active, Yellow): Memory held by currently running applications.
+• I (Inactive, Cyan): Cached memory from recently closed processes.
+• F (Free, Dark): Completely unallocated physical RAM pages.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>PerfHUD v1.0.0 by noname122021
+Lightweight system performance overlay for iOS 6.</string>
+		</dict>
+	</array>
+	<key>title</key>
+	<string>PerfHUD</string>
+</dict>
+</plist>
