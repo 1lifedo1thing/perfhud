@@ -136,6 +136,25 @@ static void ExportTelemetrySnapshot(void) {
     }
 }
 
+static float ReadGameFpsIfActive(void) {
+    FILE *f = fopen("/var/tmp/perfhud_game_fps", "r");
+    if (!f) return -1.0f;
+
+    float fps = -1.0f;
+    unsigned long ts = 0;
+    if (fscanf(f, "%f %lu", &fps, &ts) == 2) {
+        fclose(f);
+        time_t now = time(NULL);
+        // If written within last 2 seconds, game is actively rendering
+        if (now >= (time_t)ts && (now - (time_t)ts) <= 2) {
+            return fps;
+        }
+    } else {
+        fclose(f);
+    }
+    return -1.0f;
+}
+
 static void OnTimerTick(NSTimer *timer) {
     if (!s_enabled || !s_hudWindow) return;
 
@@ -152,7 +171,14 @@ static void OnTimerTick(NSTimer *timer) {
         .calc_disk_space = (!s_onlyFps && s_showDiskSpace),
         .calc_disk_io = (!s_onlyFps && s_showDiskIo)
     };
-    PerfMetrics_UpdateWithOptions(&s_snapshot, s_calculatedFps, &opts);
+
+    float displayFps = s_calculatedFps;
+    float gameFps = ReadGameFpsIfActive();
+    if (gameFps >= 0.0f) {
+        displayFps = gameFps;
+    }
+
+    PerfMetrics_UpdateWithOptions(&s_snapshot, displayFps, &opts);
     [s_hudWindow.hudView updateWithSnapshot:&s_snapshot];
     [s_hudWindow recalculateLayout];
     ExportTelemetrySnapshot();
@@ -282,7 +308,8 @@ static void OnPreferencesChanged(CFNotificationCenterRef center, void *observer,
 
 @end
 
-// Hook SBUIController & SpringBoard for orientation tracking
+%group SpringBoardHooks
+
 %hook SBUIController
 
 - (void)window:(id)window willRotateToInterfaceOrientation:(UIInterfaceOrientation)toOrientation duration:(NSTimeInterval)duration {
@@ -334,3 +361,79 @@ static void OnPreferencesChanged(CFNotificationCenterRef center, void *observer,
 }
 
 %end
+
+%end // SpringBoardHooks
+
+%group GameHooks
+
+// Game / App OpenGL ES Frame Interposer
+static NSUInteger s_appFrameCount = 0;
+static CFTimeInterval s_appLastTimestamp = 0;
+static BOOL s_gameHookEnabled = YES;
+
+%hook EAGLContext
+
+- (BOOL)presentRenderbuffer:(NSUInteger)target {
+    if (s_gameHookEnabled) {
+        s_appFrameCount++;
+        CFTimeInterval now = CACurrentMediaTime();
+        if (s_appLastTimestamp == 0) {
+            s_appLastTimestamp = now;
+        } else {
+            CFTimeInterval delta = now - s_appLastTimestamp;
+            if (delta >= 0.5) {
+                float fps = (float)((double)s_appFrameCount / delta);
+                if (fps > 60.0f) fps = 60.0f;
+                s_appFrameCount = 0;
+                s_appLastTimestamp = now;
+
+                // Atomic write to RAM disk
+                FILE *f = fopen("/var/tmp/perfhud_game_fps", "w");
+                if (f) {
+                    fprintf(f, "%.1f %lu\n", fps, (unsigned long)time(NULL));
+                    fclose(f);
+                }
+            }
+        }
+    }
+    return %orig;
+}
+
+%end
+
+%end // GameHooks
+
+static void OnGameSettingsChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
+    CFPreferencesAppSynchronize(CFSTR("com.noname122021.perfhud"));
+    Boolean valid = false;
+    Boolean bEnabled = CFPreferencesGetAppBooleanValue(CFSTR("enabled"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_gameHookEnabled = valid ? (BOOL)bEnabled : YES;
+    if (!s_gameHookEnabled) {
+        unlink("/var/tmp/perfhud_game_fps");
+    }
+}
+
+%ctor {
+    NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+    if ([bundleId isEqualToString:@"com.apple.springboard"]) {
+        // Initialize SpringBoard HUD
+        %init(SpringBoardHooks);
+    } else {
+        // We are inside a game or third-party app
+        CFPreferencesAppSynchronize(CFSTR("com.noname122021.perfhud"));
+        Boolean valid = false;
+        Boolean bEnabled = CFPreferencesGetAppBooleanValue(CFSTR("enabled"), CFSTR("com.noname122021.perfhud"), &valid);
+        s_gameHookEnabled = valid ? (BOOL)bEnabled : YES;
+
+        // If tweak is disabled in Settings, do not hook anything in games!
+        if (s_gameHookEnabled) {
+            %init(GameHooks);
+            CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
+                                            NULL,
+                                            OnGameSettingsChanged,
+                                            CFSTR("com.noname122021.perfhud/settingschanged"),
+                                            NULL,
+                                            CFNotificationSuspensionBehaviorCoalesce);
+        }
+    }
+}
