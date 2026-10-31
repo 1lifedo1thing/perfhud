@@ -230,7 +230,7 @@ Data is written atomically to RAM (/tmp/perfhud.stat) with zero NAND flash wear.
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>PerfHUD v1.1.0 by noname122021
+			<string>PerfHUD v1.1.1 by noname122021
 Lightweight system performance overlay for iOS 6.</string>
 		</dict>
 	</array>

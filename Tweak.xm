@@ -158,8 +158,47 @@ static void OnTimerTick(NSTimer *timer) {
     }
 }
 
+static void StopMonitoring(void) {
+    if (s_displayLink) {
+        [s_displayLink invalidate];
+        s_displayLink = nil;
+    }
+    if (s_updateTimer) {
+        [s_updateTimer invalidate];
+        s_updateTimer = nil;
+    }
+    s_frameCount = 0;
+    s_lastFpsTimestamp = 0;
+    // Remove stale telemetry file when disabled
+    unlink("/var/tmp/perfhud.stat");
+}
+
+static void StartMonitoring(id target) {
+    if (!s_displayLink) {
+        s_displayLink = [CADisplayLink displayLinkWithTarget:target selector:@selector(displayTick:)];
+        [s_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    }
+    if (s_updateTimer) {
+        [s_updateTimer invalidate];
+        s_updateTimer = nil;
+    }
+    s_updateTimer = [NSTimer scheduledTimerWithTimeInterval:s_refreshInterval
+                                                     target:target
+                                                   selector:@selector(timerTick:)
+                                                   userInfo:nil
+                                                    repeats:YES];
+}
+
 + (void)applySettings {
     LoadSettings();
+    if (!s_enabled) {
+        if (s_hudWindow) {
+            s_hudWindow.hidden = YES;
+        }
+        StopMonitoring();
+        return;
+    }
+
     if (!s_hudWindow) {
         s_hudWindow = [[PerfHUDWindow alloc] init];
     }
@@ -173,7 +212,9 @@ static void OnTimerTick(NSTimer *timer) {
     s_hudWindow.hudView.showDiskIo = s_showDiskIo;
 
     [s_hudWindow updatePosition:s_position withOrientation:GetCurrentActiveOrientation()];
-    s_hudWindow.hidden = !s_enabled;
+    s_hudWindow.hidden = NO;
+
+    StartMonitoring(self);
 }
 
 static void OnPreferencesChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
@@ -182,22 +223,6 @@ static void OnPreferencesChanged(CFNotificationCenterRef center, void *observer,
 
 + (void)start {
     [self applySettings];
-
-    if (!s_displayLink) {
-        s_displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayTick:)];
-        [s_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
-    }
-
-    if (s_updateTimer) {
-        [s_updateTimer invalidate];
-        s_updateTimer = nil;
-    }
-
-    s_updateTimer = [NSTimer scheduledTimerWithTimeInterval:s_refreshInterval
-                                                     target:self
-                                                   selector:@selector(timerTick:)
-                                                   userInfo:nil
-                                                    repeats:YES];
 
     CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
                                     NULL,
