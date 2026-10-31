@@ -14,8 +14,8 @@
 - (id)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        self.opaque = YES;
-        self.backgroundColor = [UIColor colorWithWhite:0.08f alpha:1.0f];
+        self.opaque = NO;
+        self.backgroundColor = [UIColor colorWithWhite:0.08f alpha:0.80f];
         self.userInteractionEnabled = NO;
         self.layer.borderColor = [UIColor colorWithWhite:0.35f alpha:1.0f].CGColor;
         self.layer.borderWidth = 1.0f;
@@ -77,8 +77,8 @@
         self.layer.borderWidth = 1.0f;
         self.layer.borderColor = [UIColor colorWithWhite:0.75f alpha:0.85f].CGColor;
     } else {
-        self.opaque = YES;
-        self.backgroundColor = [UIColor colorWithWhite:0.08f alpha:1.0f];
+        self.opaque = NO;
+        self.backgroundColor = [UIColor colorWithWhite:0.08f alpha:0.80f];
         self.layer.borderWidth = 1.0f;
         self.layer.borderColor = [UIColor colorWithWhite:0.35f alpha:1.0f].CGColor;
     }

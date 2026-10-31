@@ -18,7 +18,7 @@ static PerfMetricsSnapshot s_snapshot;
 static BOOL s_enabled = YES;
 static NSInteger s_position = 0;
 static BOOL s_isWireframe = NO;
-static NSInteger s_tapBehavior = 1; // 0: Corner Jump, 1: Pip / Peek Hide (Default: 1)
+static NSInteger s_tapBehavior = 2; // 0: Corner Jump, 1: Pip / Peek Hide, 2: Pass-Through Gaming (Default: 2)
 static BOOL s_showFps = YES;
 static BOOL s_showCpu = YES;
 static BOOL s_showRam = YES;
@@ -42,7 +42,7 @@ static void LoadSettings(void) {
     s_isWireframe = valid ? (BOOL)bWire : NO;
 
     CFIndex tapAct = CFPreferencesGetAppIntegerValue(CFSTR("tapBehavior"), CFSTR("com.noname122021.perfhud"), &valid);
-    s_tapBehavior = valid ? (NSInteger)tapAct : 1; // Default: 1 (Hide / Peek)
+    s_tapBehavior = valid ? (NSInteger)tapAct : 2; // Default: 2 (Pass-Through)
 
     Boolean bFps = CFPreferencesGetAppBooleanValue(CFSTR("showFps"), CFSTR("com.noname122021.perfhud"), &valid);
     s_showFps = valid ? (BOOL)bFps : YES;
@@ -66,8 +66,18 @@ static void LoadSettings(void) {
     s_monitorWhenScreenOff = valid ? (BOOL)bScreenOff : NO;
 }
 
+@interface UIApplication (SpringBoardOrientation)
+- (UIInterfaceOrientation)activeInterfaceOrientation;
+@end
+
 static UIInterfaceOrientation GetCurrentActiveOrientation(void) {
     UIApplication *app = [UIApplication sharedApplication];
+    if ([app respondsToSelector:@selector(activeInterfaceOrientation)]) {
+        UIInterfaceOrientation o = [app activeInterfaceOrientation];
+        if (o >= UIInterfaceOrientationPortrait && o <= UIInterfaceOrientationLandscapeLeft) {
+            return o;
+        }
+    }
     return [app statusBarOrientation];
 }
 
@@ -124,6 +134,12 @@ static void ExportTelemetrySnapshot(void) {
 
 static void OnTimerTick(NSTimer *timer) {
     if (!s_enabled || !s_hudWindow) return;
+
+    // Check active orientation every tick as a fail-safe (covers non-standard apps/games)
+    UIInterfaceOrientation activeOrient = GetCurrentActiveOrientation();
+    if (activeOrient != s_hudWindow.currentOrientation) {
+        [s_hudWindow updatePosition:s_position withOrientation:activeOrient];
+    }
 
     PerfMetricsOptions opts = {
         .calc_cpu = (bool)s_showCpu,
@@ -286,6 +302,16 @@ static void OnPreferencesChanged(CFNotificationCenterRef center, void *observer,
 - (void)frontDisplayDidChange:(id)newDisplay {
     %orig;
     [PerfHUDManager updateOrientation:GetCurrentActiveOrientation()];
+}
+
+- (void)noteInterfaceOrientationChanged:(UIInterfaceOrientation)orientation duration:(NSTimeInterval)duration updateMirroredDisplays:(BOOL)update force:(BOOL)force {
+    %orig;
+    [PerfHUDManager updateOrientation:orientation];
+}
+
+- (void)activeInterfaceOrientationDidChangeToOrientation:(UIInterfaceOrientation)toOrientation willAnimateWithDuration:(NSTimeInterval)duration fromOrientation:(UIInterfaceOrientation)fromOrientation {
+    %orig;
+    [PerfHUDManager updateOrientation:toOrientation];
 }
 
 %end

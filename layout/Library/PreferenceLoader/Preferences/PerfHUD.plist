@@ -173,7 +173,8 @@
 			<key>label</key>
 			<string>Interactive Controls</string>
 			<key>footerText</key>
-			<string>Select what happens when you tap the HUD overlay:
+			<string>Select what happens when you touch the HUD overlay:
+• Pass-Through: Touch passes straight into the app/game beneath. Ideal for gaming.
 • Hide / Peek: Hides off-screen for 2 seconds leaving a thin tab, then returns automatically.
 • Jump Corner: Immediately jumps clockwise to the next corner.</string>
 		</dict>
@@ -181,7 +182,7 @@
 			<key>cell</key>
 			<string>PSLinkListCell</string>
 			<key>default</key>
-			<integer>1</integer>
+			<integer>2</integer>
 			<key>defaults</key>
 			<string>com.noname122021.perfhud</string>
 			<key>detail</key>
@@ -189,14 +190,16 @@
 			<key>key</key>
 			<string>tapBehavior</string>
 			<key>label</key>
-			<string>Tap Action</string>
+			<string>Touch Mode</string>
 			<key>validTitles</key>
 			<array>
+				<string>Pass-Through (Gaming)</string>
 				<string>Hide / Peek (2 sec)</string>
 				<string>Jump Corner</string>
 			</array>
 			<key>validValues</key>
 			<array>
+				<integer>2</integer>
 				<integer>1</integer>
 				<integer>0</integer>
 			</array>

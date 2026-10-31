@@ -5,6 +5,20 @@
 #define MARGIN_OFFSET 6.0f
 #define PEEK_TAB_WIDTH 12.0f
 
+@interface UIWindow (PrivateContext)
+- (void)_destroyContext;
+- (void)_createContext;
+- (BOOL)_ignoresHitTest;
+@end
+
+@interface UIApplication (StatusBarPrivate)
+- (id)statusBar;
+@end
+
+@interface UIStatusBar : UIView
+- (CGFloat)currentHeight;
+@end
+
 @implementation PerfHUDWindow {
     NSInteger _currentPosition;
     UIInterfaceOrientation _currentOrientation;
@@ -12,6 +26,32 @@
 
 @synthesize hudView = _hudView;
 @synthesize tapBehavior = _tapBehavior;
+@synthesize currentOrientation = _currentOrientation;
+
+- (void)setTapBehavior:(NSInteger)behavior {
+    BOOL changed = (_tapBehavior != behavior);
+    _tapBehavior = behavior;
+    
+    // Always sync interaction & gesture with pass-through mode
+    self.userInteractionEnabled = (_tapBehavior != 2);
+    if (_tapGesture) {
+        _tapGesture.enabled = (_tapBehavior != 2);
+    }
+
+    // Recreate WindowServer CAContext so _ignoresHitTest takes effect across processes
+    if (changed || _tapBehavior == 2) {
+        if ([self respondsToSelector:@selector(_destroyContext)] &&
+            [self respondsToSelector:@selector(_createContext)]) {
+            [self _destroyContext];
+            [self _createContext];
+            self.hidden = NO;
+        }
+    }
+}
+
+- (BOOL)_ignoresHitTest {
+    return (_tapBehavior == 2);
+}
 
 - (id)init {
     CGRect screenBounds = [[UIScreen mainScreen] bounds];
@@ -21,23 +61,24 @@
                                            HUD_WIDTH,
                                            initialH)];
     if (self) {
+        self.opaque = NO;
         self.windowLevel = UIWindowLevelStatusBar + 150.0f;
         self.backgroundColor = [UIColor clearColor];
         self.userInteractionEnabled = YES;
 
         _currentPosition = 0;
         _currentOrientation = UIInterfaceOrientationPortrait;
-        _tapBehavior = 1; // default: Hide / Peek (2 sec)
+        _tapBehavior = -1; // Force setTapBehavior: to initialize context
         _isStashed = NO;
 
         _hudView = [[PerfHUDView alloc] initWithFrame:self.bounds];
         _hudView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         [self addSubview:_hudView];
 
-        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
-        tap.cancelsTouchesInView = YES;
-        [self addGestureRecognizer:tap];
-        [tap release];
+        _tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
+        _tapGesture.cancelsTouchesInView = YES;
+        _tapGesture.enabled = (_tapBehavior != 2);
+        [self addGestureRecognizer:_tapGesture];
     }
     return self;
 }
@@ -91,6 +132,13 @@
     [self updatePosition:_currentPosition withOrientation:_currentOrientation];
 }
 
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    if (_tapBehavior == 2) { // Passthrough mode: complete click-through for games
+        return nil;
+    }
+    return [super hitTest:point withEvent:event];
+}
+
 - (void)updatePosition:(NSInteger)position withOrientation:(UIInterfaceOrientation)orientation {
     _currentPosition = position;
     _currentOrientation = orientation;
@@ -116,13 +164,23 @@
 
     self.bounds = CGRectMake(0, 0, HUD_WIDTH, currentH);
 
+    UIApplication *app = [UIApplication sharedApplication];
+    BOOL isStatusBarHidden = [app isStatusBarHidden];
+    if (!isStatusBarHidden && [app respondsToSelector:@selector(statusBar)]) {
+        UIStatusBar *sb = (UIStatusBar *)[app statusBar];
+        if (sb && ([sb respondsToSelector:@selector(currentHeight)] ? [sb currentHeight] <= 0.0f : sb.hidden)) {
+            isStatusBarHidden = YES;
+        }
+    }
+    CGFloat topOffset = isStatusBarHidden ? MARGIN_OFFSET : (STATUS_BAR_OFFSET + 2.0f);
+
     CGFloat x = MARGIN_OFFSET + (HUD_WIDTH / 2.0f);
-    CGFloat y = STATUS_BAR_OFFSET + 2.0f + (currentH / 2.0f);
+    CGFloat y = topOffset + (currentH / 2.0f);
 
     switch (position) {
         case 0: // Top-Right
             x = screenW - (HUD_WIDTH / 2.0f) - MARGIN_OFFSET;
-            y = STATUS_BAR_OFFSET + 2.0f + (currentH / 2.0f);
+            y = topOffset + (currentH / 2.0f);
             break;
         case 1: // Bottom-Right
             x = screenW - (HUD_WIDTH / 2.0f) - MARGIN_OFFSET;
@@ -134,7 +192,7 @@
             break;
         case 3: // Top-Left
             x = MARGIN_OFFSET + (HUD_WIDTH / 2.0f);
-            y = STATUS_BAR_OFFSET + 2.0f + (currentH / 2.0f);
+            y = topOffset + (currentH / 2.0f);
             break;
         default:
             break;
@@ -153,9 +211,9 @@
 
     CGPoint physicalCenter = CGPointMake(x, y);
     if (orientation == UIInterfaceOrientationLandscapeRight) {
-        physicalCenter = CGPointMake(y, screenBounds.size.height - x);
-    } else if (orientation == UIInterfaceOrientationLandscapeLeft) {
         physicalCenter = CGPointMake(screenBounds.size.width - y, x);
+    } else if (orientation == UIInterfaceOrientationLandscapeLeft) {
+        physicalCenter = CGPointMake(y, screenBounds.size.height - x);
     } else if (orientation == UIInterfaceOrientationPortraitUpsideDown) {
         physicalCenter = CGPointMake(screenBounds.size.width - x, screenBounds.size.height - y);
     }
@@ -167,6 +225,11 @@
     if (_stashTimer) {
         [_stashTimer invalidate];
         _stashTimer = nil;
+    }
+    if (_tapGesture) {
+        [self removeGestureRecognizer:_tapGesture];
+        [_tapGesture release];
+        _tapGesture = nil;
     }
     [_hudView removeFromSuperview];
     [_hudView release];
