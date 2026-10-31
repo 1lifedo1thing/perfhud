@@ -32,6 +32,13 @@
     BOOL changed = (_tapBehavior != behavior);
     _tapBehavior = behavior;
     
+    // Reset stashing when behavior changes
+    if (_stashTimer) {
+        [_stashTimer invalidate];
+        _stashTimer = nil;
+    }
+    _isStashed = NO;
+    
     // Always sync interaction & gesture with pass-through mode
     self.userInteractionEnabled = (_tapBehavior != 2);
     if (_tapGesture) {
