@@ -18,6 +18,13 @@ static PerfMetricsSnapshot s_snapshot;
 static BOOL s_enabled = YES;
 static NSInteger s_position = 0;
 static BOOL s_isWireframe = NO;
+static NSInteger s_tapBehavior = 1; // 0: Corner Jump, 1: Pip / Peek Hide (Default: 1)
+static BOOL s_showFps = YES;
+static BOOL s_showCpu = YES;
+static BOOL s_showRam = YES;
+static BOOL s_showNet = YES;
+static BOOL s_showDiskSpace = YES;
+static BOOL s_showDiskIo = YES;
 static double s_refreshInterval = 0.5;
 
 static void LoadSettings(void) {
@@ -32,6 +39,27 @@ static void LoadSettings(void) {
 
     Boolean bWire = CFPreferencesGetAppBooleanValue(CFSTR("wireframe"), CFSTR("com.noname122021.perfhud"), &valid);
     s_isWireframe = valid ? (BOOL)bWire : NO;
+
+    CFIndex tapAct = CFPreferencesGetAppIntegerValue(CFSTR("tapBehavior"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_tapBehavior = valid ? (NSInteger)tapAct : 1; // Default: 1 (Hide / Peek)
+
+    Boolean bFps = CFPreferencesGetAppBooleanValue(CFSTR("showFps"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_showFps = valid ? (BOOL)bFps : YES;
+
+    Boolean bCpu = CFPreferencesGetAppBooleanValue(CFSTR("showCpu"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_showCpu = valid ? (BOOL)bCpu : YES;
+
+    Boolean bRam = CFPreferencesGetAppBooleanValue(CFSTR("showRam"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_showRam = valid ? (BOOL)bRam : YES;
+
+    Boolean bNet = CFPreferencesGetAppBooleanValue(CFSTR("showNet"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_showNet = valid ? (BOOL)bNet : YES;
+
+    Boolean bDiskSpace = CFPreferencesGetAppBooleanValue(CFSTR("showDiskSpace"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_showDiskSpace = valid ? (BOOL)bDiskSpace : YES;
+
+    Boolean bDiskIo = CFPreferencesGetAppBooleanValue(CFSTR("showDiskIo"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_showDiskIo = valid ? (BOOL)bDiskIo : YES;
 }
 
 static UIInterfaceOrientation GetCurrentActiveOrientation(void) {
@@ -68,7 +96,7 @@ static void ExportTelemetrySnapshot(void) {
     // Atomic write to /var/tmp/perfhud.stat (RAM disk)
     FILE *f = fopen("/var/tmp/perfhud.stat", "w");
     if (f) {
-        fprintf(f, "[%s] FPS:%4.1f CPU:%3.0f%% (C0:%2.0f%% C1:%2.0f%%) RAM:%.2fM/%.1fM (W:%.0f A:%.0f I:%.0f F:%.0f)\n",
+        fprintf(f, "[%s] FPS:%4.1f CPU:%3.0f%% (C0:%2.0f%% C1:%2.0f%%) RAM:%.2fM/%.1fM (W:%.0f A:%.0f I:%.0f F:%.0f) NET:D:%.1fK/U:%.1fK DISK:%.0fM(%.0f%%) IO:R:%.1fK/W:%.1fK\n",
                 timeStr,
                 s_snapshot.fps.current,
                 s_snapshot.cpu_total.current,
@@ -79,7 +107,13 @@ static void ExportTelemetrySnapshot(void) {
                 s_snapshot.ram_wired_mb,
                 s_snapshot.ram_active_mb,
                 s_snapshot.ram_inactive_mb,
-                s_snapshot.ram_free_mb);
+                s_snapshot.ram_free_mb,
+                s_snapshot.net_down_kb,
+                s_snapshot.net_up_kb,
+                s_snapshot.disk_avail_mb,
+                s_snapshot.disk_used_pct,
+                s_snapshot.disk_read_kb,
+                s_snapshot.disk_write_kb);
         fclose(f);
     }
 }
@@ -87,8 +121,16 @@ static void ExportTelemetrySnapshot(void) {
 static void OnTimerTick(NSTimer *timer) {
     if (!s_enabled || !s_hudWindow) return;
 
-    PerfMetrics_Update(&s_snapshot, s_calculatedFps);
+    PerfMetricsOptions opts = {
+        .calc_cpu = (bool)s_showCpu,
+        .calc_ram = (bool)s_showRam,
+        .calc_net = (bool)s_showNet,
+        .calc_disk_space = (bool)s_showDiskSpace,
+        .calc_disk_io = (bool)s_showDiskIo
+    };
+    PerfMetrics_UpdateWithOptions(&s_snapshot, s_calculatedFps, &opts);
     [s_hudWindow.hudView updateWithSnapshot:&s_snapshot];
+    [s_hudWindow recalculateLayout];
     ExportTelemetrySnapshot();
 }
 
@@ -121,8 +163,16 @@ static void OnTimerTick(NSTimer *timer) {
     if (!s_hudWindow) {
         s_hudWindow = [[PerfHUDWindow alloc] init];
     }
-    [s_hudWindow updatePosition:s_position withOrientation:GetCurrentActiveOrientation()];
+    s_hudWindow.tapBehavior = s_tapBehavior;
     s_hudWindow.hudView.isWireframe = s_isWireframe;
+    s_hudWindow.hudView.showFps = s_showFps;
+    s_hudWindow.hudView.showCpu = s_showCpu;
+    s_hudWindow.hudView.showRam = s_showRam;
+    s_hudWindow.hudView.showNet = s_showNet;
+    s_hudWindow.hudView.showDiskSpace = s_showDiskSpace;
+    s_hudWindow.hudView.showDiskIo = s_showDiskIo;
+
+    [s_hudWindow updatePosition:s_position withOrientation:GetCurrentActiveOrientation()];
     s_hudWindow.hidden = !s_enabled;
 }
 

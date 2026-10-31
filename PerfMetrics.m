@@ -3,12 +3,39 @@
 #import <mach/mach_host.h>
 #import <mach/processor_info.h>
 #import <sys/sysctl.h>
+#import <sys/socket.h>
+#import <ifaddrs.h>
+#import <net/if.h>
+#import <net/if_var.h>
+#import <net/if_dl.h>
+#import <sys/mount.h>
+#import <sys/time.h>
+#import <CoreFoundation/CoreFoundation.h>
+
+typedef mach_port_t io_object_t;
+typedef io_object_t io_registry_entry_t;
+typedef io_object_t io_iterator_t;
+extern const mach_port_t kIOMasterPortDefault;
+CFMutableDictionaryRef IOServiceMatching(const char *name);
+kern_return_t IOServiceGetMatchingServices(mach_port_t masterPort, CFDictionaryRef matching, io_iterator_t *existing);
+io_object_t IOIteratorNext(io_iterator_t iterator);
+kern_return_t IORegistryEntryCreateCFProperties(io_registry_entry_t entry, CFMutableDictionaryRef *properties, CFAllocatorRef allocator, uint32_t options);
+kern_return_t IOObjectRelease(io_object_t object);
 
 static unsigned long long s_last_cpu_total = 0;
 static unsigned long long s_last_cpu_busy = 0;
 static unsigned long long s_last_core_total[MAX_CORES] = {0};
 static unsigned long long s_last_core_busy[MAX_CORES] = {0};
 static uint64_t s_ram_total_bytes = 0;
+
+static uint64_t s_last_ibytes = 0;
+static uint64_t s_last_obytes = 0;
+static uint64_t s_last_net_time_us = 0;
+
+static io_registry_entry_t s_cached_drive = 0;
+static uint64_t s_last_disk_read_bytes = 0;
+static uint64_t s_last_disk_write_bytes = 0;
+static uint64_t s_last_disk_time_us = 0;
 
 void PerfMetrics_Init(void) {
     int mib[2] = { CTL_HW, HW_MEMSIZE };
@@ -18,6 +45,15 @@ void PerfMetrics_Init(void) {
         s_ram_total_bytes = mem;
     } else {
         s_ram_total_bytes = 512 * 1024 * 1024;
+    }
+
+    if (!s_cached_drive) {
+        io_iterator_t iter = 0;
+        CFMutableDictionaryRef matching = IOServiceMatching("IOBlockStorageDriver");
+        if (matching && IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iter) == 0 && iter) {
+            s_cached_drive = IOIteratorNext(iter);
+            IOObjectRelease(iter);
+        }
     }
 }
 
@@ -110,15 +146,131 @@ static void ReadRAM(PerfMetricsSnapshot *s) {
     }
 }
 
-void PerfMetrics_Update(PerfMetricsSnapshot *snapshot, float current_fps) {
+static void ReadNetwork(PerfMetricsSnapshot *s) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    uint64_t now_us = (uint64_t)tv.tv_sec * 1000000ULL + (uint64_t)tv.tv_usec;
+
+    struct ifaddrs *ifa_list = NULL;
+    if (getifaddrs(&ifa_list) != 0) return;
+
+    uint64_t ibytes = 0, obytes = 0;
+    for (struct ifaddrs *ifa = ifa_list; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_LINK) {
+            struct if_data *ifd = (struct if_data *)ifa->ifa_data;
+            if (ifd && strcmp(ifa->ifa_name, "lo0") != 0 && (ifa->ifa_flags & IFF_UP)) {
+                ibytes += ifd->ifi_ibytes;
+                obytes += ifd->ifi_obytes;
+            }
+        }
+    }
+    freeifaddrs(ifa_list);
+
+    if (s_last_net_time_us > 0 && now_us > s_last_net_time_us) {
+        double dt = (double)(now_us - s_last_net_time_us) / 1000000.0;
+        if (dt > 0.05) {
+            if (ibytes >= s_last_ibytes) {
+                s->net_down_kb = (float)((double)(ibytes - s_last_ibytes) / (1024.0 * dt));
+            }
+            if (obytes >= s_last_obytes) {
+                s->net_up_kb = (float)((double)(obytes - s_last_obytes) / (1024.0 * dt));
+            }
+        }
+    }
+    s_last_ibytes = ibytes;
+    s_last_obytes = obytes;
+    s_last_net_time_us = now_us;
+    PerfMetrics_PushHistory(&s->net_down, s->net_down_kb);
+}
+
+static void ReadDiskSpace(PerfMetricsSnapshot *s) {
+    struct statfs sf;
+    if (statfs("/private/var", &sf) == 0) {
+        float total_gb = (float)((double)sf.f_blocks * sf.f_bsize / (1024.0 * 1024.0 * 1024.0));
+        float avail_mb = (float)((double)sf.f_bavail * sf.f_bsize / (1024.0 * 1024.0));
+        s->disk_total_gb = total_gb;
+        s->disk_avail_mb = avail_mb;
+        s->disk_avail_gb = avail_mb / 1024.0f;
+        if (total_gb > 0.01f) {
+            float total_mb = total_gb * 1024.0f;
+            s->disk_used_pct = ((total_mb - avail_mb) / total_mb) * 100.0f;
+        }
+    }
+}
+
+static void ReadDiskIo(PerfMetricsSnapshot *s) {
+    if (!s_cached_drive) {
+        io_iterator_t iter = 0;
+        CFMutableDictionaryRef matching = IOServiceMatching("IOBlockStorageDriver");
+        if (matching && IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iter) == 0 && iter) {
+            s_cached_drive = IOIteratorNext(iter);
+            IOObjectRelease(iter);
+        }
+    }
+
+    if (s_cached_drive) {
+        CFMutableDictionaryRef props = NULL;
+        if (IORegistryEntryCreateCFProperties(s_cached_drive, &props, kCFAllocatorDefault, 0) == 0 && props) {
+            CFDictionaryRef stats = (CFDictionaryRef)CFDictionaryGetValue(props, CFSTR("Statistics"));
+            if (stats) {
+                CFNumberRef rNum = (CFNumberRef)CFDictionaryGetValue(stats, CFSTR("Bytes (Read)"));
+                CFNumberRef wNum = (CFNumberRef)CFDictionaryGetValue(stats, CFSTR("Bytes (Write)"));
+                int64_t rb = 0, wb = 0;
+                if (rNum) CFNumberGetValue(rNum, kCFNumberSInt64Type, &rb);
+                if (wNum) CFNumberGetValue(wNum, kCFNumberSInt64Type, &wb);
+
+                struct timeval tv;
+                gettimeofday(&tv, NULL);
+                uint64_t now_us = (uint64_t)tv.tv_sec * 1000000ULL + (uint64_t)tv.tv_usec;
+
+                if (s_last_disk_time_us > 0 && now_us > s_last_disk_time_us) {
+                    double dt = (double)(now_us - s_last_disk_time_us) / 1000000.0;
+                    if (dt > 0.05) {
+                        if ((uint64_t)rb >= s_last_disk_read_bytes) {
+                            s->disk_read_kb = (float)((double)((uint64_t)rb - s_last_disk_read_bytes) / (1024.0 * dt));
+                        }
+                        if ((uint64_t)wb >= s_last_disk_write_bytes) {
+                            s->disk_write_kb = (float)((double)((uint64_t)wb - s_last_disk_write_bytes) / (1024.0 * dt));
+                        }
+                    }
+                }
+                s_last_disk_read_bytes = (uint64_t)rb;
+                s_last_disk_write_bytes = (uint64_t)wb;
+                s_last_disk_time_us = now_us;
+            }
+            CFRelease(props);
+        }
+    }
+    PerfMetrics_PushHistory(&s->disk_write, s->disk_write_kb);
+}
+
+void PerfMetrics_UpdateWithOptions(PerfMetricsSnapshot *snapshot, float current_fps, const PerfMetricsOptions *opts) {
     if (s_ram_total_bytes == 0) {
         PerfMetrics_Init();
     }
 
     PerfMetrics_PushHistory(&snapshot->fps, current_fps);
-    ReadCPU(snapshot);
-    ReadRAM(snapshot);
 
-    float avail_ram = snapshot->ram_free_mb + snapshot->ram_inactive_mb;
-    PerfMetrics_PushHistory(&snapshot->ram_free, avail_ram);
+    if (opts->calc_cpu) {
+        ReadCPU(snapshot);
+    }
+    if (opts->calc_ram) {
+        ReadRAM(snapshot);
+        float avail_ram = snapshot->ram_free_mb + snapshot->ram_inactive_mb;
+        PerfMetrics_PushHistory(&snapshot->ram_free, avail_ram);
+    }
+    if (opts->calc_net) {
+        ReadNetwork(snapshot);
+    }
+    if (opts->calc_disk_space) {
+        ReadDiskSpace(snapshot);
+    }
+    if (opts->calc_disk_io) {
+        ReadDiskIo(snapshot);
+    }
+}
+
+void PerfMetrics_Update(PerfMetricsSnapshot *snapshot, float current_fps) {
+    PerfMetricsOptions default_opts = { true, true, true, true, true };
+    PerfMetrics_UpdateWithOptions(snapshot, current_fps, &default_opts);
 }

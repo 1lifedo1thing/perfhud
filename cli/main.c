@@ -11,8 +11,8 @@ int main(int argc, char *argv[]) {
     }
 
     const char *path = "/var/tmp/perfhud.stat";
-    char line[256];
-    char last_line[256] = {0};
+    char line[512];
+    char last_line[512] = {0};
 
     if (access(path, F_OK) != 0) {
         fprintf(stderr, "PerfHUD is not running or disabled in Settings.\n");

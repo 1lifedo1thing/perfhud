@@ -2,26 +2,32 @@
 
 Zero-footprint real-time performance HUD and CLI telemetry monitor for legacy iOS (ARMv7, iOS 6.0–6.1.6).
 
+<p align="center">
+  <img src="screenshot.png" width="320" alt="PerfHUD running on iOS 6"><br>
+  <i>PerfHUD v1.1.0 running on iPhone 4 (iOS 6.1.3)</i>
+</p>
+
 ![iOS 6](https://img.shields.io/badge/iOS-6.0%E2%80%936.1.6-blue.svg)
 ![Architecture](https://img.shields.io/badge/Arch-ARMv7%2032--bit-brightgreen.svg)
-![Version](https://img.shields.io/badge/Version-1.0.0-orange.svg)
+![Version](https://img.shields.io/badge/Version-1.1.0-orange.svg)
 
 ## Features
 
 - **Real-Time Display:**
   - **FPS & Frametime:** Hardware-synchronized via `CADisplayLink` (60 Hz VSync) with sparkline history graph.
-  - **CPU Utilization:** Overall CPU load and per-core breakdown (`C0`, `C1` for Apple A5 dual-core) with individual sparkline graphs and color thresholds (Blue < 65%, Yellow 65-85%, Red > 85%).
-  - **Memory Metrics:** Active vs Inactive cache, total physical RAM, and detailed breakdown (`Wired`, `Active`, `Inactive`, `Free`).
-  - **Stacked Memory Bar:** Visual page-allocation bar.
+  - **CPU Utilization:** Overall CPU load and per-core breakdown (`C0`, `C1` for Apple A5 dual-core; dynamic single-core mode on Apple A4) with sparklines and color thresholds.
+  - **Memory Metrics:** Sub-MB precision RAM tracking with dedicated tall auto-scaling sparkline and stacked memory breakdown bar (`Wired`, `Active`, `Inactive`, `Free`).
+  - **Network Speeds:** Zero-overhead Darwin network throughput (Download/Upload rates & incoming sparkline).
+  - **NAND Disk I/O:** Hardware disk read/write throughput via IOKit and available storage with percentage bar.
 - **Interactive Control:**
-  - Tap directly on the HUD panel to jump it clockwise to the next screen corner, instantly unblocking UI elements beneath.
+  - **Hide / Peek:** Tap to hide off-screen for 2 seconds leaving a thin tab, returning automatically.
+  - **Corner Jump:** Tap to jump clockwise to the next screen corner.
 - **CLI Telemetry Streaming (`perfhud-cli`):**
   - Stream metrics over SSH directly to your terminal without GUI overhead (`perfhud-cli -f`).
   - Zero NAND flash wear: writes atomically to RAM (`/var/tmp/perfhud.stat`).
 - **Zero-Footprint Design:**
   - Single CoreGraphics render pass at 2 Hz (0.5s interval).
-  - Pure C Mach kernel queries (`host_processor_info`, `host_statistics`).
-  - Optional Wireframe mode (no background) in Settings.
+  - Per-metric toggles in Settings with CPU-saving mode (disabled metrics skip kernel queries).
 
 ## CLI Usage
 

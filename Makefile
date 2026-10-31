@@ -6,7 +6,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = PerfHUD
 PerfHUD_FILES = Tweak.xm PerfHUDWindow.m PerfHUDView.m PerfMetrics.m
-PerfHUD_FRAMEWORKS = UIKit CoreGraphics QuartzCore
+PerfHUD_FRAMEWORKS = UIKit CoreGraphics QuartzCore IOKit CoreFoundation
 PerfHUD_CFLAGS = -fno-objc-arc
 
 include $(THEOS_MAKE_PATH)/tweak.mk

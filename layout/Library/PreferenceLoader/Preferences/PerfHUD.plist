@@ -81,9 +81,127 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
+			<string>Visible Metrics</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>key</key>
+			<string>showFps</string>
+			<key>label</key>
+			<string>Show FPS</string>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>key</key>
+			<string>showCpu</string>
+			<key>label</key>
+			<string>Show CPU &amp; Cores</string>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>key</key>
+			<string>showRam</string>
+			<key>label</key>
+			<string>Show RAM &amp; Memory Bar</string>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>key</key>
+			<string>showNet</string>
+			<key>label</key>
+			<string>Show Network Speed</string>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>key</key>
+			<string>showDiskIo</string>
+			<key>label</key>
+			<string>Show Disk I/O Activity</string>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>key</key>
+			<string>showDiskSpace</string>
+			<key>label</key>
+			<string>Show Disk Storage Bar</string>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
 			<string>Interactive Controls</string>
 			<key>footerText</key>
-			<string>Tap directly on the HUD panel anytime to jump it to the next corner clockwise, unblocking the interface beneath.</string>
+			<string>Select what happens when you tap the HUD overlay:
+• Hide / Peek: Hides off-screen for 2 seconds leaving a thin tab, then returns automatically.
+• Jump Corner: Immediately jumps clockwise to the next corner.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSLinkListCell</string>
+			<key>default</key>
+			<integer>1</integer>
+			<key>defaults</key>
+			<string>com.noname122021.perfhud</string>
+			<key>detail</key>
+			<string>PSListItemsController</string>
+			<key>key</key>
+			<string>tapBehavior</string>
+			<key>label</key>
+			<string>Tap Action</string>
+			<key>validTitles</key>
+			<array>
+				<string>Hide / Peek (2 sec)</string>
+				<string>Jump Corner</string>
+			</array>
+			<key>validValues</key>
+			<array>
+				<integer>1</integer>
+				<integer>0</integer>
+			</array>
+			<key>PostNotification</key>
+			<string>com.noname122021.perfhud/settingschanged</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -112,7 +230,7 @@ Data is written atomically to RAM (/tmp/perfhud.stat) with zero NAND flash wear.
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>PerfHUD v1.0.0 by noname122021
+			<string>PerfHUD v1.1.0 by noname122021
 Lightweight system performance overlay for iOS 6.</string>
 		</dict>
 	</array>
