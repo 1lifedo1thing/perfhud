@@ -25,6 +25,7 @@ static BOOL s_showRam = YES;
 static BOOL s_showNet = YES;
 static BOOL s_showDiskSpace = YES;
 static BOOL s_showDiskIo = YES;
+static BOOL s_monitorWhenScreenOff = NO;
 static double s_refreshInterval = 0.5;
 
 static void LoadSettings(void) {
@@ -60,6 +61,9 @@ static void LoadSettings(void) {
 
     Boolean bDiskIo = CFPreferencesGetAppBooleanValue(CFSTR("showDiskIo"), CFSTR("com.noname122021.perfhud"), &valid);
     s_showDiskIo = valid ? (BOOL)bDiskIo : YES;
+
+    Boolean bScreenOff = CFPreferencesGetAppBooleanValue(CFSTR("monitorWhenScreenOff"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_monitorWhenScreenOff = valid ? (BOOL)bScreenOff : NO;
 }
 
 static UIInterfaceOrientation GetCurrentActiveOrientation(void) {
@@ -138,11 +142,34 @@ static void OnTimerTick(NSTimer *timer) {
 + (void)start;
 + (void)applySettings;
 + (void)updateOrientation:(UIInterfaceOrientation)orientation;
++ (void)screenDimmed;
++ (void)screenUndimmed;
 + (void)displayTick:(CADisplayLink *)link;
 + (void)timerTick:(NSTimer *)timer;
 @end
 
 @implementation PerfHUDManager
+
++ (void)screenDimmed {
+    if (!s_enabled) return;
+    if (s_hudWindow) {
+        s_hudWindow.hidden = YES;
+    }
+    if (!s_monitorWhenScreenOff) {
+        StopMonitoring();
+    }
+}
+
++ (void)screenUndimmed {
+    if (!s_enabled) return;
+    if (s_hudWindow) {
+        s_hudWindow.hidden = NO;
+        [s_hudWindow updatePosition:s_position withOrientation:GetCurrentActiveOrientation()];
+    }
+    if (!s_monitorWhenScreenOff) {
+        StartMonitoring(self);
+    }
+}
 
 + (void)displayTick:(CADisplayLink *)link {
     OnDisplayLinkTick(link);
@@ -259,6 +286,20 @@ static void OnPreferencesChanged(CFNotificationCenterRef center, void *observer,
 - (void)frontDisplayDidChange:(id)newDisplay {
     %orig;
     [PerfHUDManager updateOrientation:GetCurrentActiveOrientation()];
+}
+
+%end
+
+%hook SBAwayController
+
+- (void)dimScreen:(BOOL)dimmed {
+    %orig;
+    [PerfHUDManager screenDimmed];
+}
+
+- (void)undimScreen:(BOOL)undimmed {
+    %orig;
+    [PerfHUDManager screenUndimmed];
 }
 
 %end
