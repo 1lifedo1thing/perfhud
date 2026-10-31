@@ -143,6 +143,7 @@
     _currentPosition = position;
     _currentOrientation = orientation;
 
+    CGFloat currentW = [_hudView calculateContentWidth];
     CGFloat currentH = [_hudView calculateContentHeight];
     CGRect screenBounds = [[UIScreen mainScreen] bounds];
     
@@ -162,7 +163,8 @@
         self.transform = CGAffineTransformMakeRotation(M_PI);
     }
 
-    self.bounds = CGRectMake(0, 0, HUD_WIDTH, currentH);
+    self.bounds = CGRectMake(0, 0, currentW, currentH);
+    _hudView.frame = self.bounds;
 
     UIApplication *app = [UIApplication sharedApplication];
     BOOL isStatusBarHidden = [app isStatusBarHidden];
@@ -174,24 +176,24 @@
     }
     CGFloat topOffset = isStatusBarHidden ? MARGIN_OFFSET : (STATUS_BAR_OFFSET + 2.0f);
 
-    CGFloat x = MARGIN_OFFSET + (HUD_WIDTH / 2.0f);
+    CGFloat x = MARGIN_OFFSET + (currentW / 2.0f);
     CGFloat y = topOffset + (currentH / 2.0f);
 
     switch (position) {
         case 0: // Top-Right
-            x = screenW - (HUD_WIDTH / 2.0f) - MARGIN_OFFSET;
+            x = screenW - (currentW / 2.0f) - MARGIN_OFFSET;
             y = topOffset + (currentH / 2.0f);
             break;
         case 1: // Bottom-Right
-            x = screenW - (HUD_WIDTH / 2.0f) - MARGIN_OFFSET;
+            x = screenW - (currentW / 2.0f) - MARGIN_OFFSET;
             y = screenH - (currentH / 2.0f) - MARGIN_OFFSET;
             break;
         case 2: // Bottom-Left
-            x = MARGIN_OFFSET + (HUD_WIDTH / 2.0f);
+            x = MARGIN_OFFSET + (currentW / 2.0f);
             y = screenH - (currentH / 2.0f) - MARGIN_OFFSET;
             break;
         case 3: // Top-Left
-            x = MARGIN_OFFSET + (HUD_WIDTH / 2.0f);
+            x = MARGIN_OFFSET + (currentW / 2.0f);
             y = topOffset + (currentH / 2.0f);
             break;
         default:
@@ -202,10 +204,10 @@
     if (_isStashed) {
         // If on the right side (pos 0 or 1), push off right edge leaving PEEK_TAB_WIDTH visible
         if (position == 0 || position == 1) {
-            x = screenW + (HUD_WIDTH / 2.0f) - PEEK_TAB_WIDTH;
+            x = screenW + (currentW / 2.0f) - PEEK_TAB_WIDTH;
         } else {
             // Push off left edge leaving PEEK_TAB_WIDTH visible
-            x = -(HUD_WIDTH / 2.0f) + PEEK_TAB_WIDTH;
+            x = -(currentW / 2.0f) + PEEK_TAB_WIDTH;
         }
     }
 

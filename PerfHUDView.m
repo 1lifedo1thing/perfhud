@@ -4,6 +4,7 @@
 @implementation PerfHUDView
 
 @synthesize isWireframe = _isWireframe;
+@synthesize onlyFps = _onlyFps;
 @synthesize showFps = _showFps;
 @synthesize showCpu = _showCpu;
 @synthesize showRam = _showRam;
@@ -31,11 +32,22 @@
 
         _monoFont = [[UIFont fontWithName:@"Courier-Bold" size:9.0f] retain];
         _smallFont = [[UIFont fontWithName:@"Courier-Bold" size:8.0f] retain];
+        _frapsFont = [[UIFont boldSystemFontOfSize:22.0f] retain];
     }
     return self;
 }
 
+- (CGFloat)calculateContentWidth {
+    if (_onlyFps) {
+        return 44.0f; // Minimal Fraps counter width
+    }
+    return 126.0f;
+}
+
 - (CGFloat)calculateContentHeight {
+    if (_onlyFps) {
+        return 24.0f; // Minimal Fraps counter height
+    }
     CGFloat h = 8.0f; // top + bottom padding
     CGFloat row_h = 13.0f;
 
@@ -69,8 +81,25 @@
     return h;
 }
 
+- (void)setOnlyFps:(BOOL)onlyFps {
+    _onlyFps = onlyFps;
+    if (_onlyFps) {
+        self.layer.borderWidth = 0.0f;
+        self.backgroundColor = [UIColor clearColor];
+    } else {
+        [self setIsWireframe:_isWireframe];
+    }
+    [self setNeedsDisplay];
+}
+
 - (void)setIsWireframe:(BOOL)isWireframe {
     _isWireframe = isWireframe;
+    if (_onlyFps) {
+        self.layer.borderWidth = 0.0f;
+        self.backgroundColor = [UIColor clearColor];
+        [self setNeedsDisplay];
+        return;
+    }
     if (isWireframe) {
         self.opaque = NO;
         self.backgroundColor = [UIColor clearColor];
@@ -138,6 +167,35 @@ static void DrawSparkline(CGContextRef ctx, CGRect rect, const PerfMetricHistory
 
 - (void)drawRect:(CGRect)rect {
     CGContextRef ctx = UIGraphicsGetCurrentContext();
+
+    if (_onlyFps) {
+        CGContextClearRect(ctx, rect);
+        int fpsVal = (int)(_snapshot.fps.current + 0.5f);
+        if (fpsVal > 60) fpsVal = 60;
+        if (fpsVal < 0) fpsVal = 0;
+        NSString *fpsNumStr = [NSString stringWithFormat:@"%d", fpsVal];
+
+        // Modern status colors: Green (smooth 55-60), Yellow (minor drop 40-54), Red (stutter < 40)
+        UIColor *fpsColor;
+        if (fpsVal >= 55) {
+            fpsColor = [UIColor colorWithRed:0.2f green:0.95f blue:0.25f alpha:1.0f]; // Vivid Green
+        } else if (fpsVal >= 40) {
+            fpsColor = [UIColor colorWithRed:1.0f green:0.85f blue:0.15f alpha:1.0f]; // Alert Yellow
+        } else {
+            fpsColor = [UIColor colorWithRed:1.0f green:0.25f blue:0.25f alpha:1.0f]; // Severe Drop Red
+        }
+
+        // Draw crisp 1px black outline for contrast on any background
+        [[UIColor blackColor] setFill];
+        [fpsNumStr drawAtPoint:CGPointMake(2.0f, 1.0f) withFont:_frapsFont];
+        [fpsNumStr drawAtPoint:CGPointMake(0.0f, 1.0f) withFont:_frapsFont];
+        [fpsNumStr drawAtPoint:CGPointMake(1.0f, 2.0f) withFont:_frapsFont];
+        [fpsNumStr drawAtPoint:CGPointMake(1.0f, 0.0f) withFont:_frapsFont];
+
+        [fpsColor setFill];
+        [fpsNumStr drawAtPoint:CGPointMake(1.0f, 1.0f) withFont:_frapsFont];
+        return;
+    }
 
     if (_isWireframe) {
         CGContextClearRect(ctx, rect);
@@ -331,6 +389,8 @@ static void DrawSparkline(CGContextRef ctx, CGRect rect, const PerfMetricHistory
 }
 
 - (void)dealloc {
+    [_frapsFont release];
+    _frapsFont = nil;
     [_monoFont release];
     _monoFont = nil;
     [_smallFont release];

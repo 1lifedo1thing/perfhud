@@ -4,8 +4,10 @@
 @interface PerfHUDView : UIView {
     PerfMetricsSnapshot _snapshot;
     BOOL _isWireframe;
+    BOOL _onlyFps;
     UIFont *_monoFont;
     UIFont *_smallFont;
+    UIFont *_frapsFont;
 
     // Visibility options
     BOOL _showFps;
@@ -17,6 +19,7 @@
 }
 
 @property (nonatomic, assign) BOOL isWireframe;
+@property (nonatomic, assign) BOOL onlyFps;
 @property (nonatomic, assign) BOOL showFps;
 @property (nonatomic, assign) BOOL showCpu;
 @property (nonatomic, assign) BOOL showRam;
@@ -26,5 +29,6 @@
 
 - (void)updateWithSnapshot:(const PerfMetricsSnapshot *)snapshot;
 - (CGFloat)calculateContentHeight;
+- (CGFloat)calculateContentWidth;
 
 @end

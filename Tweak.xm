@@ -16,6 +16,7 @@ static PerfMetricsSnapshot s_snapshot;
 
 // Settings
 static BOOL s_enabled = YES;
+static BOOL s_onlyFps = NO;
 static NSInteger s_position = 0;
 static BOOL s_isWireframe = NO;
 static NSInteger s_tapBehavior = 2; // 0: Corner Jump, 1: Pip / Peek Hide, 2: Pass-Through Gaming (Default: 2)
@@ -34,6 +35,9 @@ static void LoadSettings(void) {
 
     Boolean bEnabled = CFPreferencesGetAppBooleanValue(CFSTR("enabled"), CFSTR("com.noname122021.perfhud"), &valid);
     s_enabled = valid ? (BOOL)bEnabled : YES;
+
+    Boolean bOnlyFps = CFPreferencesGetAppBooleanValue(CFSTR("onlyFps"), CFSTR("com.noname122021.perfhud"), &valid);
+    s_onlyFps = valid ? (BOOL)bOnlyFps : NO;
 
     CFIndex pos = CFPreferencesGetAppIntegerValue(CFSTR("position"), CFSTR("com.noname122021.perfhud"), &valid);
     s_position = valid ? (NSInteger)pos : 0;
@@ -142,11 +146,11 @@ static void OnTimerTick(NSTimer *timer) {
     }
 
     PerfMetricsOptions opts = {
-        .calc_cpu = (bool)s_showCpu,
-        .calc_ram = (bool)s_showRam,
-        .calc_net = (bool)s_showNet,
-        .calc_disk_space = (bool)s_showDiskSpace,
-        .calc_disk_io = (bool)s_showDiskIo
+        .calc_cpu = (!s_onlyFps && s_showCpu),
+        .calc_ram = (!s_onlyFps && s_showRam),
+        .calc_net = (!s_onlyFps && s_showNet),
+        .calc_disk_space = (!s_onlyFps && s_showDiskSpace),
+        .calc_disk_io = (!s_onlyFps && s_showDiskIo)
     };
     PerfMetrics_UpdateWithOptions(&s_snapshot, s_calculatedFps, &opts);
     [s_hudWindow.hudView updateWithSnapshot:&s_snapshot];
@@ -246,6 +250,7 @@ static void StartMonitoring(id target) {
         s_hudWindow = [[PerfHUDWindow alloc] init];
     }
     s_hudWindow.tapBehavior = s_tapBehavior;
+    s_hudWindow.hudView.onlyFps = s_onlyFps;
     s_hudWindow.hudView.isWireframe = s_isWireframe;
     s_hudWindow.hudView.showFps = s_showFps;
     s_hudWindow.hudView.showCpu = s_showCpu;
