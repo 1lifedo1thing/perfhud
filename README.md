@@ -53,4 +53,4 @@ Configurable via Settings.app $\to$ **PerfHUD**:
 
 ## License
 
-GPL-3.0 License. Author: noname122021.
+MIT License. Author: noname122021.
